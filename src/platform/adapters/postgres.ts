@@ -158,6 +158,18 @@ export function table(tableName: string, options: TableOptions): DataSource {
       return (result.rows[0] as Row) ?? null;
     },
 
+    async insert(row: Row): Promise<Row> {
+      const entries = Object.entries(row);
+      const columns = entries.map(([col]) => ident(col));
+      const placeholders = entries.map((_, i) => `$${i + 1}`);
+      const result = await getPool().query(
+        `INSERT INTO ${quoteIdent(tableName, [tableName])} (${columns.join(", ")})
+         VALUES (${placeholders.join(", ")}) RETURNING *`,
+        entries.map(([, v]) => v),
+      );
+      return result.rows[0] as Row;
+    },
+
     async update(id: string, patch: Row): Promise<Row> {
       const entries = Object.entries(patch);
       if (!entries.length) {

@@ -45,6 +45,59 @@ export function applyFieldVisibility(
   return out;
 }
 
+/**
+ * Row-level access filters for this user, injected into every list query and
+ * re-checked against single rows on detail/action paths.
+ */
+export function rowAccessFilters(app: AppConfig, user: User): Filter[] {
+  return app.access.rows?.({ id: user.id, roles: user.roles }) ?? [];
+}
+
+/** Evaluates a filter against an already-fetched row (authorization, not querying). */
+export function matchesFilters(row: Row, filters: Filter[]): boolean {
+  return filters.every(({ field, op, value }) => {
+    const actual = row[field];
+    switch (op) {
+      case "eq":
+        return actual === value;
+      case "neq":
+        return actual !== value;
+      case "in":
+        return Array.isArray(value) && value.includes(actual);
+      case "contains":
+        return String(actual ?? "").toLowerCase().includes(String(value).toLowerCase());
+      case "gt":
+        return Number(actual) > Number(value);
+      case "gte":
+        return Number(actual) >= Number(value);
+      case "lt":
+        return Number(actual) < Number(value);
+      case "lte":
+        return Number(actual) <= Number(value);
+    }
+  });
+}
+
+export function requireRowAccess(app: AppConfig, user: User, row: Row): void {
+  if (!matchesFilters(row, rowAccessFilters(app, user))) {
+    throw new HttpError(404, `Row not found`);
+  }
+}
+
+/**
+ * Same-origin check for mutating routes. Session cookies are attached by the
+ * browser to cross-site requests too, so the Origin header is verified before
+ * any action or create runs.
+ */
+export function assertSameOrigin(request: Request): void {
+  const origin = request.headers.get("origin");
+  if (!origin) return;
+  const host = request.headers.get("host");
+  if (!host || new URL(origin).host !== host) {
+    throw new HttpError(403, "Cross-origin request rejected");
+  }
+}
+
 const NUMERIC_KINDS = new Set(["number", "money"]);
 
 /**

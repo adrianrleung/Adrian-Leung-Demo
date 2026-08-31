@@ -17,6 +17,7 @@ function fakeSource(capabilities: Capabilities): DataSource {
     fields: ["id", "name", "amount", "status"],
     list: async () => ({ rows: [], total: 0, nextCursor: null }),
     get: async () => null,
+    insert: async (row) => row,
     update: async () => ({}),
   };
 }
@@ -25,6 +26,7 @@ function config(source: DataSource, overrides: Partial<AppConfig> = {}): AppConf
   return {
     slug: "test",
     name: "Test",
+    owner: "test-team",
     source,
     access: { view: ["everyone"] },
     fields: {
@@ -82,5 +84,17 @@ describe("validateApp", () => {
       },
     });
     expect(() => validateApp(app)).toThrow(/no required role/);
+  });
+
+  it("rejects a config with no owner", () => {
+    const app = config(fakeSource(FULL), { owner: "" });
+    expect(() => validateApp(app)).toThrow(/owner is required/);
+  });
+
+  it("rejects a create form over a read-only field", () => {
+    const app = config(fakeSource(FULL), {
+      create: { fields: ["id", "name"] },
+    });
+    expect(() => validateApp(app)).toThrow(/read-only/);
   });
 });

@@ -1,0 +1,81 @@
+# Per-app deployment (N-container model): each internal tool ships as its own
+# image, Deployment, and hostname, so a crash or compromise stays in one app.
+# New app: copy this file, replace "refunds" throughout, deploy.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: refunds
+  labels:
+    app: refunds
+    platform: internal-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: refunds
+  template:
+    metadata:
+      labels:
+        app: refunds
+    spec:
+      containers:
+        - name: refunds
+          image: internal-tools/refunds:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: AUTH_MODE
+              value: demo # set to "entra" with the secrets below for real SSO
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: refunds-secrets
+                  key: database-url
+          envFrom:
+            - secretRef:
+                name: refunds-entra
+                optional: true # AZURE_TENANT_ID/CLIENT_ID/CLIENT_SECRET, AUTH_SECRET, ENTRA_GROUP_ROLE_MAP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: refunds
+spec:
+  selector:
+    app: refunds
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: refunds
+spec:
+  rules:
+    - host: refunds.tools.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: refunds
+                port:
+                  number: 80

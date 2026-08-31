@@ -10,6 +10,7 @@ export default defineApp({
   slug: "refunds",
   name: "Refunds Review",
   description: "Approve or decline customer refund requests.",
+  owner: "payments-team",
 
   source: postgres.table("refund_requests", {
     primaryKey: "id",
@@ -79,6 +80,12 @@ export default defineApp({
       ["decided_by", "decided_at"],
       "decline_reason",
     ],
+  },
+
+  create: {
+    fields: ["customer_name", "customer_email", "amount", "currency", "reason"],
+    requires: "support-agent",
+    defaults: () => ({ status: "pending", risk_flag: "low" }),
   },
 
   actions: {

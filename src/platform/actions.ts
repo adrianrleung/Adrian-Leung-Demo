@@ -1,6 +1,6 @@
 import { record } from "./audit";
 import { hasRole, type User } from "./users";
-import { HttpError } from "./server";
+import { HttpError, requireRowAccess } from "./server";
 import type { ActionContext, AppConfig, Row } from "./types";
 
 /** Stub effect. A real deployment swaps this for an Incoming Webhook call. */
@@ -27,6 +27,7 @@ export async function runAction(
 
   const row = await app.source.get(rowId);
   if (!row) throw new HttpError(404, `Row ${rowId} not found`);
+  requireRowAccess(app, user, row);
 
   for (const [name, def] of Object.entries(action.fields ?? {})) {
     if (def.kind === "text" && !String(input[name] ?? "").trim()) {
