@@ -12,11 +12,22 @@ export interface User {
  * groups, and every check happens server-side.
  */
 export const DEMO_USERS: Record<string, User> = {
-  analyst: { id: "u-analyst", name: "Sam Okafor", roles: ["support-agent"] },
+  analyst: {
+    id: "u-analyst",
+    name: "Sam Okafor",
+    roles: ["support-agent", "kyc-analyst", "engineer"],
+  },
   lead: {
     id: "u-lead",
     name: "Adrian Leung",
-    roles: ["support-agent", "finance-lead"],
+    roles: [
+      "support-agent",
+      "finance-lead",
+      "kyc-analyst",
+      "compliance-lead",
+      "engineer",
+      "platform-admin",
+    ],
   },
 };
 
