@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/platform/auth";
+import { toResponse } from "@/platform/http";
 import {
-  HttpError,
   applyFieldVisibility,
   parseQuery,
   requireVisibleApp,
@@ -30,12 +30,4 @@ export async function GET(
   } catch (error) {
     return toResponse(error);
   }
-}
-
-export function toResponse(error: unknown) {
-  if (error instanceof HttpError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
-  }
-  console.error(error);
-  return NextResponse.json({ error: "Internal error" }, { status: 500 });
 }

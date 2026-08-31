@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { runAction } from "@/platform/actions";
 import { currentUser } from "@/platform/auth";
 import { requireVisibleApp } from "@/platform/server";
-import { toResponse } from "../../rows/route";
+import { toResponse } from "@/platform/http";
 import type { Row } from "@/platform/types";
 
 export async function POST(
