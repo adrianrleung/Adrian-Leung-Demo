@@ -46,6 +46,22 @@ kubectl apply -f deploy/k8s/postgres.yaml -f deploy/k8s/refunds.yaml
 
 New app: copy `deploy/k8s/refunds.yaml`, rename, deploy.
 
+## Production checklist (one-time, before the first real app)
+
+1. **Entra ID sign-in** — app registration in your tenant (redirect URI
+   `https://<host>/api/auth/callback/microsoft-entra-id`, groups claim, client
+   secret), env vars below as k8s secrets, `AUTH_MODE=entra`.
+2. **Managed Postgres** (e.g. Azure Database for PostgreSQL) instead of the
+   demo pod. Run `db/grants.sql` with admin credentials and point
+   `DATABASE_URL` at the INSERT-only-audit `app_user` role.
+3. **Ingress + TLS** — internal DNS per app (edit the host in the app's
+   manifest) behind your existing ingress controller / cert-manager.
+4. **CI** — lint/typecheck/test/build on PR (config errors fail the build);
+   image build + `kubectl apply` on merge.
+
+Known gaps: the rate limiter is in-memory (fine at 1 replica; use Redis to
+scale out) and probes hit `/` (no dedicated `/healthz` route yet).
+
 ## Real sign-in (Entra ID)
 
 Local demo uses a role switcher (`AUTH_MODE=demo`, the default). For SSO set:
