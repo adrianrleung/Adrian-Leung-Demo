@@ -1,4 +1,6 @@
 import refunds from "@/apps/refunds.app";
+import kycReview from "@/apps/kyc-review.app";
+import featureFlags from "@/apps/feature-flags.app";
 import type { AppConfig } from "./types";
 
 /**
@@ -8,6 +10,8 @@ import type { AppConfig } from "./types";
  */
 const ALL: readonly AppConfig[] = [
   refunds,
+  kycReview,
+  featureFlags,
 ];
 
 export const APPS: readonly AppConfig[] = ALL;

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Pool } from "pg";
 
@@ -23,7 +23,13 @@ async function main() {
   });
 
   await pool.query(readFileSync(join(process.cwd(), "db/schema.sql"), "utf8"));
-  await pool.query("TRUNCATE refund_requests, audit_log RESTART IDENTITY");
+  const migrationsDir = join(process.cwd(), "db/migrations");
+  for (const file of readdirSync(migrationsDir).sort()) {
+    await pool.query(readFileSync(join(migrationsDir, file), "utf8"));
+  }
+  await pool.query(
+    "TRUNCATE refund_requests, kyc_cases, feature_flags, audit_log RESTART IDENTITY",
+  );
 
   const values: unknown[] = [];
   const tuples: string[] = [];
@@ -54,8 +60,60 @@ async function main() {
     values,
   );
 
-  const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM refund_requests");
-  console.log(`Seeded ${rows[0].n} refund requests`);
+  const kycValues: unknown[] = [];
+  const kycTuples: string[] = [];
+  const COUNTRIES = ["PT", "DE", "IE", "FR", "NL", "ES"];
+  const FLAGS = [
+    "Document mismatch", "Sanctions list near-match", "High-velocity signups",
+    "PEP screening hit", "Address verification failed",
+  ];
+  const KYC_STATUS = ["pending", "pending", "pending", "escalated", "cleared", "rejected"] as const;
+  for (let i = 0; i < 400; i++) {
+    const name = NAMES[(i * 3) % NAMES.length];
+    const score = 10 + ((i * 37) % 90);
+    const base = kycValues.length;
+    kycValues.push(
+      name,
+      `${name.toLowerCase().replace(/[^a-z]+/g, ".")}@example.com`,
+      `P${String(10000000 + i * 991).slice(0, 8)}`,
+      COUNTRIES[i % COUNTRIES.length],
+      score,
+      score >= 70 ? "high" : score >= 40 ? "medium" : "low",
+      FLAGS[i % FLAGS.length],
+      KYC_STATUS[i % KYC_STATUS.length],
+      new Date(Date.now() - i * 53 * 60 * 1000).toISOString(),
+    );
+    kycTuples.push(
+      `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9})`,
+    );
+  }
+  await pool.query(
+    `INSERT INTO kyc_cases
+       (customer_name, customer_email, document_number, country, risk_score, risk_band, flag_reason, status, submitted_at)
+     VALUES ${kycTuples.join(",")}`,
+    kycValues,
+  );
+
+  const FLAGS_SEED: Array<[string, string, string, string, string]> = [
+    ["new-onboarding-flow", "Redesigned onboarding funnel", "prod", "off", "growth-team"],
+    ["instant-payouts", "Instant payout rail for verified users", "prod", "on", "payments-team"],
+    ["instant-payouts", "Instant payout rail for verified users", "staging", "on", "payments-team"],
+    ["dark-mode", "Dark mode UI", "dev", "on", "web-team"],
+    ["risk-engine-v2", "Second-generation risk scoring", "staging", "off", "compliance-team"],
+    ["sepa-transfers", "SEPA credit transfers", "prod", "on", "payments-team"],
+  ];
+  for (const [key, description, environment, enabled, owner] of FLAGS_SEED) {
+    await pool.query(
+      `INSERT INTO feature_flags (flag_key, description, environment, enabled, owner_team, updated_by)
+       VALUES ($1, $2, $3, $4, $5, 'seed')`,
+      [key, description, environment, enabled, owner],
+    );
+  }
+
+  for (const table of ["refund_requests", "kyc_cases", "feature_flags"]) {
+    const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM ${table}`);
+    console.log(`Seeded ${rows[0].n} rows into ${table}`);
+  }
   await pool.end();
 }
 

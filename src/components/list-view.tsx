@@ -28,7 +28,8 @@ export function ListView({ app }: { app: ClientApp }) {
       const params = new URLSearchParams();
       for (const [name, value] of Object.entries(filters)) {
         if (!value) continue;
-        const op = app.fields[name].kind === "money" ? "gte" : "eq";
+        const kind = app.fields[name].kind;
+        const op = kind === "money" || kind === "number" ? "gte" : "eq";
         params.set(`f.${name}:${op}`, value);
       }
       if (search) params.set("q", search);
@@ -92,12 +93,16 @@ export function ListView({ app }: { app: ClientApp }) {
                 </select>
               ) : (
                 <input
-                  type="number"
+                  type={
+                    def.kind === "number" || def.kind === "money" ? "number" : "text"
+                  }
                   value={filters[name] ?? ""}
                   onChange={(event) =>
                     setFilters((f) => ({ ...f, [name]: event.target.value }))
                   }
-                  placeholder="min"
+                  placeholder={
+                    def.kind === "number" || def.kind === "money" ? "min" : "exact"
+                  }
                   className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
                 />
               )}
