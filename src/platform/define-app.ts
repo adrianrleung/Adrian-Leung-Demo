@@ -51,6 +51,10 @@ export function validateApp(config: AppConfig): void {
     return true;
   };
 
+  if (!config.owner?.trim()) {
+    problems.push("owner is required: every app names the team that maintains it");
+  }
+
   for (const column of config.list.columns) requireField(column, "list.columns");
 
   for (const name of config.list.filters ?? []) {
@@ -90,6 +94,13 @@ export function validateApp(config: AppConfig): void {
       problems.push(
         `list.defaultSort uses "${sort.field}" but the field is not marked sortable`,
       );
+    }
+  }
+
+  for (const name of config.create?.fields ?? []) {
+    if (!requireField(name, "create.fields")) continue;
+    if (config.fields[name].readOnly) {
+      problems.push(`create.fields includes "${name}" but the field is read-only`);
     }
   }
 

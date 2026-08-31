@@ -2,9 +2,13 @@ import { notFound } from "next/navigation";
 import { DetailView } from "@/components/detail-view";
 import { RoleSwitcher } from "@/components/role-switcher";
 import { history } from "@/platform/audit";
-import { currentUser, hasRole } from "@/platform/auth";
+import { AUTH_MODE, currentUser, hasRole } from "@/platform/auth";
 import { getApp } from "@/platform/registry";
-import { applyFieldVisibility } from "@/platform/server";
+import {
+  applyFieldVisibility,
+  matchesFilters,
+  rowAccessFilters,
+} from "@/platform/server";
 import { toClientApp } from "@/platform/view-model";
 
 export default async function AppDetailPage({
@@ -18,13 +22,15 @@ export default async function AppDetailPage({
   if (!config || !hasRole(user, config.access.view)) notFound();
 
   const row = await config.source.get(id);
-  if (!row) notFound();
+  if (!row || !matchesFilters(row, rowAccessFilters(config, user))) notFound();
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-8">
-      <div className="flex justify-end">
-        <RoleSwitcher user={user} />
-      </div>
+      {AUTH_MODE === "demo" && (
+        <div className="flex justify-end">
+          <RoleSwitcher user={user} />
+        </div>
+      )}
       <DetailView
         app={toClientApp(config, user)}
         row={applyFieldVisibility(config, user, row)}

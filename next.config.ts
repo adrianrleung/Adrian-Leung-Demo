@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Self-contained server bundle for the ~100MB Docker image (see deploy/).
+  output: "standalone",
 };
 
 export default nextConfig;

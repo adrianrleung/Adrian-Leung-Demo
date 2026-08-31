@@ -7,6 +7,7 @@ import type { User } from "../users";
 const app = {
   slug: "t",
   name: "T",
+  owner: "test-team",
   source: {} as AppConfig["source"],
   access: { view: ["agent"] },
   fields: {

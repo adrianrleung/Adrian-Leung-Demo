@@ -18,6 +18,8 @@ export interface ClientApp {
     defaultSort?: Sort;
   };
   detail: { layout: LayoutSlot[] };
+  /** Present when the app accepts submissions and this user may submit. */
+  create?: { fields: string[] };
   actions: ClientAction[];
 }
 
@@ -48,6 +50,11 @@ export function toClientApp(app: AppConfig, user: User): ClientApp {
         ? [...app.detail.layout]
         : Object.keys(app.fields).map((name) => name),
     },
+    create:
+      app.create &&
+      (!app.create.requires || hasRole(user, [app.create.requires]))
+        ? { fields: [...app.create.fields] }
+        : undefined,
     actions: Object.entries(app.actions ?? {}).map(([name, action]) => ({
       name,
       label: action.label,

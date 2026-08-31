@@ -18,7 +18,7 @@ export function RoleSwitcher({ user }: { user: User }) {
       <select
         value={currentKey}
         onChange={(event) => {
-          document.cookie = `demo-user=${event.target.value}; path=/`;
+          document.cookie = `demo-user=${event.target.value}; path=/; SameSite=Strict`;
           router.refresh();
         }}
         className="rounded-md border border-slate-300 px-2 py-1 text-slate-900"

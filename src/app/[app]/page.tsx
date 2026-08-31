@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
+import { CreateButton } from "@/components/create-form";
 import { ListView } from "@/components/list-view";
 import { RoleSwitcher } from "@/components/role-switcher";
-import { currentUser, hasRole } from "@/platform/auth";
+import { AUTH_MODE, currentUser, hasRole } from "@/platform/auth";
 import { getApp } from "@/platform/registry";
 import { toClientApp } from "@/platform/view-model";
 
@@ -24,7 +25,10 @@ export default async function AppListPage({
             <p className="mt-1 text-sm text-slate-500">{config.description}</p>
           )}
         </div>
-        <RoleSwitcher user={user} />
+        <div className="flex items-center gap-4">
+          {AUTH_MODE === "demo" && <RoleSwitcher user={user} />}
+          <CreateButton app={toClientApp(config, user)} />
+        </div>
       </header>
       <ListView app={toClientApp(config, user)} />
     </main>

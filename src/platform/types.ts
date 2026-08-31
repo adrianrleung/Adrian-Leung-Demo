@@ -66,6 +66,7 @@ export interface DataSource {
   readonly fields: readonly string[];
   list(query: Query): Promise<Page<Row>>;
   get(id: string): Promise<Row | null>;
+  insert(row: Row): Promise<Row>;
   update(id: string, patch: Row): Promise<Row>;
 }
 
@@ -127,8 +128,17 @@ export interface AppConfig {
   slug: string;
   name: string;
   description?: string;
+  /** Owning team, e.g. "payments-team". Required so no app is unowned. */
+  owner: string;
   source: DataSource;
-  access: { view: readonly string[] };
+  access: {
+    view: readonly string[];
+    /**
+     * Row-level access: filters injected server-side into every list query
+     * and re-checked against individual rows on detail/action paths.
+     */
+    rows?: (user: { id: string; roles: readonly string[] }) => Filter[];
+  };
   fields: Record<string, FieldDef>;
   list: {
     columns: readonly string[];
@@ -137,6 +147,14 @@ export interface AppConfig {
     defaultSort?: Sort;
   };
   detail?: { layout: readonly LayoutSlot[] };
+  /** Enables a generic "new request" form for submitting rows. */
+  create?: {
+    fields: readonly string[];
+    /** Role required to submit. Defaults to anyone who can view the app. */
+    requires?: string;
+    /** Server-side values merged over the submitted input. */
+    defaults?: (user: { id: string; name: string }) => Row;
+  };
   actions?: Record<string, ActionDef>;
   audit?: boolean;
 }

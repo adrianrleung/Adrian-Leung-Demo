@@ -156,16 +156,23 @@ every canvas app by hand, so adding the 12th app adds 12th-app QA cost.
   field-level masking by payload stripping (2 tests)
 - Append-only audit log with activity timeline
 - `refunds` demo app, 1,200 seeded rows
+- Entra ID OIDC (`AUTH_MODE=entra`, Auth.js) with group→role mapping;
+  `AUTH_MODE=demo` keeps the role switcher and needs no tenant (see §10)
+- CSRF origin check + per-user rate limiting on mutating routes
+- Row-level access (`access.rows`) injected server-side into every query
+- Generic submit form (`create` config) with server-side defaults
+- Required `owner` metadata, validated at build time
+- Scaffold CLI: `npm run new-app -- <slug>`
+- Audit-log immutability grants (`db/grants.sql`, INSERT/SELECT-only app role)
+- Per-app Docker/k8s deploy templates (`deploy/`)
 
 **Not built (ordered by value):**
 1. Adapter contract test suite (§6.2) — needed before a second adapter
 2. Generated per-app Playwright smoke tests (§6.3)
 3. REST adapter — proves "plug and play" beyond one data source
-4. Real Entra ID OIDC to replace the cookie stub in `auth.ts`
-5. CI check: every `filterable`/`sortable` field has a backing index
-6. CI check: every `apps/*.app.ts` has a CODEOWNERS owner
-7. Plugin packaging (field types, adapters, effects as installable modules)
-8. Teams webhook (currently `console.info` in `actions.ts`)
+4. CI check: every `filterable`/`sortable` field has a backing index
+5. Plugin packaging (field types, adapters, effects as installable modules)
+6. Teams webhook (currently `console.info` in `actions.ts`)
 
 ---
 
@@ -199,7 +206,9 @@ npm run typecheck && npm run lint && npm test
 
 ### Adding an app
 
-Write `src/apps/<name>.app.ts` and add one line to `src/platform/registry.ts`.
+`npm run new-app -- <slug>` scaffolds the config, a SQL migration, and the
+registry entry. Or by hand: write `src/apps/<name>.app.ts` and add one line to
+`src/platform/registry.ts`.
 `src/apps/refunds.app.ts` is the complete reference — ~120 lines including both
 action handlers, and the only non-declarative parts are the two `run` functions.
 
@@ -211,3 +220,41 @@ action handlers, and the only non-declarative parts are the two `run` functions.
 - **Permissions:** switch the role selector from Adrian Leung (finance-lead) to
   Sam Okafor (support-agent). Action buttons disable, and `customer_email`
   arrives masked **in the API payload**, not merely hidden in the UI.
+
+---
+
+## 10. Entra ID sign-in
+
+`AUTH_MODE=entra` switches `currentUser()` from the demo cookie to an Auth.js
+session backed by Microsoft Entra ID. Roles come from the ID token's group
+claims via `ENTRA_GROUP_ROLE_MAP`, a JSON object of Entra group object IDs to
+platform role names. Nothing else changes: `access.view`, `action.requires`
+and field masking consume the same `User`.
+
+Required env: `AUTH_MODE=entra`, `AUTH_SECRET` (any random 32+ bytes),
+`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`,
+`ENTRA_GROUP_ROLE_MAP='{"<group-object-id>":"finance-lead", ...}'`.
+
+Tenant setup: register an app, redirect URI
+`https://<host>/api/auth/callback/microsoft-entra-id`, add the **groups**
+claim to the ID token, create a client secret.
+
+CI and unit tests never talk to Azure: the claim handling is pure
+(`src/platform/entra.ts`) and tested with fake tokens; everything else runs
+under `AUTH_MODE=demo`.
+
+---
+
+## 11. Deployment (N-container model)
+
+Each app deploys as its own image and Deployment — isolation over deploy
+count, per the decision that tools are built once and rarely touched.
+
+```bash
+docker build -f deploy/Dockerfile -t internal-tools/refunds .
+kubectl apply -f deploy/k8s/postgres.yaml -f deploy/k8s/refunds.yaml
+```
+
+New app: copy `deploy/k8s/refunds.yaml`, rename, deploy. Audit immutability:
+apply `db/grants.sql` with admin credentials and point `DATABASE_URL` at
+`app_user`.
