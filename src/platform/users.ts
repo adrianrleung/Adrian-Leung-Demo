@@ -15,7 +15,7 @@ export const DEMO_USERS: Record<string, User> = {
   analyst: {
     id: "u-analyst",
     name: "Sam Okafor",
-    roles: ["support-agent", "kyc-analyst", "engineer"],
+    roles: ["support-agent", "kyc-analyst", "engineer", "employee"],
   },
   lead: {
     id: "u-lead",
@@ -27,6 +27,8 @@ export const DEMO_USERS: Record<string, User> = {
       "compliance-lead",
       "engineer",
       "platform-admin",
+      "employee",
+      "people-ops-admin",
     ],
   },
 };

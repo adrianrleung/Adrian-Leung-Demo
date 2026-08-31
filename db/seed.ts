@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Pool } from "pg";
+import { EMPLOYEES } from "./data/employees";
 
 const NAMES = [
   "Maria Ferreira", "Ken Adachi", "Ana Sousa", "Liam Byrne", "Priya Nair",
@@ -28,7 +29,7 @@ async function main() {
     await pool.query(readFileSync(join(migrationsDir, file), "utf8"));
   }
   await pool.query(
-    "TRUNCATE refund_requests, kyc_cases, feature_flags, audit_log RESTART IDENTITY",
+    "TRUNCATE refund_requests, kyc_cases, feature_flags, employees, audit_log RESTART IDENTITY",
   );
 
   const values: unknown[] = [];
@@ -110,11 +111,85 @@ async function main() {
     );
   }
 
-  for (const table of ["refund_requests", "kyc_cases", "feature_flags"]) {
+  await seedEmployees(pool);
+
+  for (const table of ["refund_requests", "kyc_cases", "feature_flags", "employees"]) {
     const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM ${table}`);
     console.log(`Seeded ${rows[0].n} rows into ${table}`);
   }
   await pool.end();
+}
+
+/**
+ * The employee directory is seeded from a fixed roster so the app looks like
+ * one that has been in use for a while: staggered start dates, alumni rows,
+ * and an audit trail of the lifecycle changes People Ops already made.
+ */
+async function seedEmployees(pool: Pool) {
+  const monthsAgo = (months: number) => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - months);
+    date.setHours(9, 0, 0, 0);
+    return date.toISOString();
+  };
+  const slugify = (name: string) =>
+    name.toLowerCase().normalize("NFD").replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "");
+
+  for (const [index, employee] of EMPLOYEES.entries()) {
+    const handle = slugify(employee.name);
+    const changed = employee.status !== "active";
+    const { rows } = await pool.query(
+      `INSERT INTO employees
+         (employee_number, full_name, work_email, personal_email, phone, job_title,
+          department, team, manager, location, employment_type, status,
+          start_date, end_date, salary, equity_options, note, updated_by, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+       RETURNING id`,
+      [
+        `E-${String(1001 + index)}`,
+        employee.name,
+        `${handle}@example.com`,
+        `${handle}${index}@personalmail.com`,
+        `+351 9${String(10000000 + index * 137).slice(0, 8)}`,
+        employee.title,
+        employee.department,
+        employee.team,
+        employee.manager,
+        employee.location,
+        employee.employmentType,
+        employee.status,
+        monthsAgo(employee.tenureMonths),
+        employee.endMonths === undefined ? null : monthsAgo(employee.endMonths),
+        employee.salary,
+        employee.equityOptions,
+        employee.note ?? null,
+        changed ? "Ana Sousa" : null,
+        changed ? monthsAgo(1) : null,
+      ],
+    );
+
+    const id = String(rows[0].id);
+    await pool.query(
+      `INSERT INTO audit_log (app, row_id, actor_id, actor_name, event, detail, created_at)
+       VALUES ('employee-directory', $1, 'u-lead', 'Ana Sousa', 'create', $2, $3)`,
+      [id, JSON.stringify({ job_title: employee.title, department: employee.department }), monthsAgo(employee.tenureMonths)],
+    );
+
+    const lifecycle =
+      employee.status === "on-leave"
+        ? { event: "start_leave", months: 1 }
+        : employee.status === "notice-period" || employee.status === "departed"
+          ? { event: "offboard", months: (employee.endMonths ?? 0) + 2 }
+          : null;
+
+    if (lifecycle) {
+      await pool.query(
+        `INSERT INTO audit_log (app, row_id, actor_id, actor_name, event, detail, created_at)
+         VALUES ('employee-directory', $1, 'u-lead', 'Ana Sousa', $2, $3, $4)`,
+        [id, lifecycle.event, JSON.stringify({ note: employee.note }), monthsAgo(lifecycle.months)],
+      );
+    }
+  }
 }
 
 void main();
