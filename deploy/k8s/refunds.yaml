@@ -21,9 +21,14 @@ spec:
       containers:
         - name: refunds
           image: internal-tools/refunds:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           env:
+            # Kubernetes sets HOSTNAME to the pod name; Next standalone binds
+            # to it, which breaks port-forwarding. Bind all interfaces.
+            - name: HOSTNAME
+              value: "0.0.0.0"
             - name: AUTH_MODE
               value: demo # set to "entra" with the secrets below for real SSO
             - name: DATABASE_URL
